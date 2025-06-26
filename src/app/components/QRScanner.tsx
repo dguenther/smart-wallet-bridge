@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import {
   Box,
   Button,
@@ -33,6 +33,58 @@ export default function EnhancedQrScanner({
   const videoRef = useRef<HTMLVideoElement>(null);
   const controlsRef = useRef<IScannerControls | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+
+  const handleClose = useCallback(() => {
+    setScannerActive(false);
+    if (controlsRef.current) {
+      controlsRef.current.stop();
+      controlsRef.current = null;
+    }
+    onClose();
+  }, [onClose]);
+
+  const startEnhancedScanning = useCallback(() => {
+    const interval = setInterval(async () => {
+      if (!videoRef.current || !canvasRef.current) return;
+
+      const canvas = canvasRef.current;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+
+      const video = videoRef.current;
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+      // Get the image data
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const enhancedImageUrl = applyEnhancements(imageData);
+
+      // Try decoding the enhanced image
+      try {
+        const reader = new BrowserQRCodeReader();
+        const img = new Image();
+        img.src = enhancedImageUrl;
+
+        img.onload = async () => {
+          try {
+            const result = await reader.decodeFromImageElement(img);
+            if (result?.getText()?.startsWith("wc:")) {
+              await onScan(result.getText());
+              handleClose();
+            }
+          } catch {
+            // Ignore failed attempts
+          }
+        };
+      } catch (error) {
+        console.error("Enhanced QR scan error:", error);
+      }
+    }, 500); // Capture and enhance every 500ms
+
+    return () => clearInterval(interval);
+  }, [onScan, handleClose]);
 
   useEffect(() => {
     if (!scannerActive || !videoRef.current) return;
@@ -84,50 +136,7 @@ export default function EnhancedQrScanner({
         controlsRef.current = null;
       }
     };
-  }, [scannerActive, onScan]);
-
-  const startEnhancedScanning = () => {
-    const interval = setInterval(async () => {
-      if (!videoRef.current || !canvasRef.current) return;
-
-      const canvas = canvasRef.current;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return;
-
-      const video = videoRef.current;
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-      // Get the image data
-      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      const enhancedImageUrl = applyEnhancements(imageData);
-
-      // Try decoding the enhanced image
-      try {
-        const reader = new BrowserQRCodeReader();
-        const img = new Image();
-        img.src = enhancedImageUrl;
-
-        img.onload = async () => {
-          try {
-            const result = await reader.decodeFromImageElement(img);
-            if (result?.getText()?.startsWith("wc:")) {
-              await onScan(result.getText());
-              handleClose();
-            }
-          } catch (error) {
-            // Ignore failed attempts
-          }
-        };
-      } catch (error) {
-        console.error("Enhanced QR scan error:", error);
-      }
-    }, 500); // Capture and enhance every 500ms
-
-    return () => clearInterval(interval);
-  };
+  }, [scannerActive, onScan, handleClose, startEnhancedScanning]);
 
   function applyEnhancements(imageData: ImageData): string {
     const { data, width, height } = imageData;
@@ -189,15 +198,6 @@ export default function EnhancedQrScanner({
     setLoading(true);
     onOpen();
     setTimeout(() => setScannerActive(true), 200);
-  }
-
-  function handleClose() {
-    setScannerActive(false);
-    if (controlsRef.current) {
-      controlsRef.current.stop();
-      controlsRef.current = null;
-    }
-    onClose();
   }
 
   return (

@@ -87,10 +87,10 @@ export default function ActiveSessions({
               </Text>
               <HStack wrap="wrap" spacing={2}>
                 {session.namespaces.eip155?.accounts.map((account: string) => {
-                  const [namespace, chainIdStr] = account.split(":");
+                  const [, chainIdStr] = account.split(":");
                   const accountChainId = parseInt(chainIdStr);
                   const chainName =
-                    chainIdToChain[accountChainId]?.name || chainIdStr;
+                    chainIdToChain(accountChainId)?.name || chainIdStr;
                   return (
                     <Badge
                       key={account}

@@ -4,7 +4,6 @@ import {
   Heading,
   Input,
   VStack,
-  InputGroup,
 } from "@chakra-ui/react";
 import QrScanner from "./QRScanner";
 

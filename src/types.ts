@@ -1,40 +1,3 @@
-import { SingleValue } from "chakra-react-select";
-import { JsonFragmentType, TransactionDescription } from "ethers";
-
-export interface SelectedOption {
-  label: string;
-  value: number | string | boolean;
-}
-
-export type SelectedOptionState = SingleValue<SelectedOption>;
-
-export interface ExplorersData {
-  [label: string]: ExplorerData;
-}
-
-export interface ExplorerData {
-  urlLayout: string;
-  chainIdToLabel: { [chainId: number]: string };
-  // some explorer favicons don't automatically work via gstatic
-  faviconUrl?: string;
-  // some icons can be entirely white in color, which would require the background color to change from white
-  faviconWhite?: boolean;
-  forContracts?: boolean;
-}
-
-export enum ExplorerType {
-  ADDRESS,
-  TX,
-}
-
-export interface ILeaderboard {
-  _id: string;
-  lastBlockNumber: number;
-  totalUSDAmount: number;
-  donorsCount: number;
-  topDonorsWithEns: { address: string; ens: string; usdAmount: number }[];
-}
-
 export type DecodeBytesParamResult = {
   decoded: DecodeRecursiveResult;
 };
@@ -57,10 +20,6 @@ export type DecodeArrayParamResult =
       rawValue: any;
       value: DecodeParamTypesResult;
     }[];
-
-export interface ParsedTransaction extends TransactionDescription {
-  txType?: "safeMultiSend";
-}
 
 export type DecodeParamTypesResult =
   | string
@@ -90,11 +49,6 @@ export type HighlightedText = {
 };
 
 export type HighlightedContent = string | HighlightedText[];
-
-export interface ExtendedJsonFragmentType
-  extends Omit<JsonFragmentType, "name"> {
-  name?: HighlightedContent;
-}
 
 export interface SourceCode {
   sources: Record<string, { content: string }>;

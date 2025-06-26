@@ -12,7 +12,7 @@ export const decodeSignMessage = (hexMessage: string) => {
             decoded: hexToString(hexMessage),
             type: "utf8",
           };
-        } catch (e) {
+        } catch {
           // If that fails, return the original hex
           return {
             decoded: hexMessage,

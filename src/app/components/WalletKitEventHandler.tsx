@@ -146,8 +146,8 @@ export default function WalletKitEventHandler({
           const txData = request.params.request.params[0];
 
           if (txData.data) {
-            const chainIdStr = request.params.chainId.split(":")[1];
-            const chainIdNum = parseInt(chainIdStr);
+            // const chainIdStr = request.params.chainId.split(":")[1];
+            // const chainIdNum = parseInt(chainIdStr);
 
             // const decodedData = await decodeRecursive({
             //   calldata: txData.data,
@@ -155,7 +155,7 @@ export default function WalletKitEventHandler({
             //   chainId: chainIdNum,
             // });
 
-            console.log("Decoded transaction data:", "decodedData");
+            // console.log("Decoded transaction data:", "decodedData");
             setDecodedTxData("decodedData");
           }
         } catch (error) {

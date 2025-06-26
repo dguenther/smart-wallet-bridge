@@ -4,10 +4,10 @@ import {
     WalletClient,
     createPublicClient,
     createWalletClient,
-    fromHex,
     getAddress,
     http,
     numberToHex,
+    TransactionRequest
   } from "viem";
   import { createBundlerClient, entryPoint06Abi, entryPoint06Address, toCoinbaseSmartAccount } from "viem/account-abstraction";
   import { privateKeyToAccount } from "viem/accounts";
@@ -150,7 +150,8 @@ import {
             console.log("request", args);
             if (args[0].method === "eth_sendTransaction") {
               console.log("custom handler! for eth_sendTransaction", args);
-              const tx = args[0].params[0];
+              // @ts-expect-error - TODO: not sure this is the right type
+              const tx: TransactionRequest = args[0].params[0];
   
               const userOp = await bundlerClient.prepareUserOperation({
                 calls: [

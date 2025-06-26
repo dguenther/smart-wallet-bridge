@@ -46,7 +46,7 @@ import { DecodedSignatureData, SessionRequest } from "../types";
 import { chainIdToChain } from "@/utils/supportedChains";
 import { useCallback, useEffect, useState } from "react";
 import axios from "axios";
-import { fetchContractAbi, generateTenderlyUrl } from "@/utils";
+import { generateTenderlyUrl } from "@/utils";
 import { BsArrowsAngleExpand, BsArrowsAngleContract } from "react-icons/bs";
 
 interface SessionRequestModalProps {
@@ -103,14 +103,14 @@ export default function SessionRequestModal({
 
       try {
         const client = createPublicClient({
-          chain: chainIdToChain[chainId],
+          chain: chainIdToChain(chainId),
           transport: http(),
         });
 
         // check if the address is a contract
-        const res = await client.getCode({
-          address: address as Address,
-        });
+        // const res = await client.getCode({
+        //   address: address as Address,
+        // });
 
         // try fetching the contract symbol() if it's a token
         try {
@@ -122,10 +122,7 @@ export default function SessionRequestModal({
           setAddressLabels([symbol]);
         } catch {
           // else try fetching the contract name if it's verified
-          const fetchedAbi = await fetchContractAbi({ address, chainId });
-          if (fetchedAbi) {
-            setAddressLabels([fetchedAbi.name]);
-          }
+          // TODO: consider reimplementing contract fetching
         }
       } catch {
         try {
@@ -998,7 +995,7 @@ export default function SessionRequestModal({
                     size={{ base: "sm", md: "md" }}
                   >
                     Switch to{" "}
-                    {chainIdToChain[targetChainId]?.name ||
+                    {chainIdToChain(targetChainId)?.name ||
                       `Chain ID: ${targetChainId}`}
                   </Button>
                 ) : (
