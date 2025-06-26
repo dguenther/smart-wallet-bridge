@@ -30,7 +30,6 @@ import {
   Text,
   Tooltip,
   VStack,
-  Image,
 } from "@chakra-ui/react";
 import { Global } from "@emotion/react";
 import { useAccount } from "wagmi";
@@ -966,12 +965,6 @@ export default function SessionRequestModal({
                   }}
                 >
                   <HStack>
-                    <Image
-                      src="/external/tenderly-favicon.ico"
-                      alt="Tenderly"
-                      width={5}
-                      height={5}
-                    />
                     <Text color="white">Simulate</Text>
                   </HStack>
                 </Button>
