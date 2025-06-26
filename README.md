@@ -2,6 +2,8 @@
 
 Bridge a Smart Wallet with WalletConnect to dapps that don't support the Smart Wallet SDK.
 
+Try it out at https://dguenther.github.io/smart-wallet-bridge/.
+
 Based on the excellent [Swiss Knife](https://github.com/swiss-knife-xyz/swiss-knife).
 
 ## Getting Started
