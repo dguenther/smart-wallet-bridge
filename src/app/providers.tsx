@@ -21,7 +21,7 @@ import {
 } from "@rainbow-me/rainbowkit/wallets";
 import { supportedChains } from "@/utils/supportedChains";
 
-const appName = "smart-wallet-walletconnect";
+const appName = "smart-wallet-bridge";
 const projectId = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID!;
 
 const connectors = connectorsForWallets(
