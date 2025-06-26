@@ -156,7 +156,7 @@ export default function WalletKitEventHandler({
             // });
 
             // console.log("Decoded transaction data:", "decodedData");
-            setDecodedTxData("decodedData");
+            setDecodedTxData(null);
           }
         } catch (error) {
           console.error("Error decoding transaction data:", error);
