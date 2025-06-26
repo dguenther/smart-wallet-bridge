@@ -73,6 +73,11 @@ jobs:
             ${{ runner.os }}-nextjs-${{ hashFiles('**/package-lock.json', '**/yarn.lock') }}-
       - name: Install dependencies
         run: ${{ steps.detect-package-manager.outputs.manager }} ${{ steps.detect-package-manager.outputs.command }}
+      - name: Inject environment variables
+        run: |
+          echo "NEXT_PUBLIC_DEVELOPMENT=true" >> .env
+          echo "NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=22207608507aa9567e37375b728414ca" >> .env
+
       - name: Build with Next.js
         run: ${{ steps.detect-package-manager.outputs.runner }} next build
       - name: Upload artifact
