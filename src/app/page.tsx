@@ -25,6 +25,8 @@ import {
   FormHelperText,
   useColorModeValue,
   Textarea,
+  IconButton,
+  HStack,
 } from "@chakra-ui/react";
 import {
   useAccount,
@@ -32,11 +34,13 @@ import {
   useChainId,
   useSwitchChain,
   useConnect,
+  useBalance,
 } from "wagmi";
 import { mnemonicToAccount } from "viem/accounts";
 import { bytesToHex } from "viem";
 import { buildApprovedNamespaces } from "@walletconnect/utils";
 import { headlessCSWConnector } from "@/utils/headlessCSWConnector";
+import { CopyIcon } from "@chakra-ui/icons";
 
 // Import types
 import { SessionProposal, SessionRequest, WalletKitInstance } from "./types";
@@ -60,6 +64,9 @@ export default function WalletBridgePage() {
   const chainId = useChainId();
   const { switchChainAsync } = useSwitchChain();
   const { connect } = useConnect();
+  const { data: balance } = useBalance({
+    address: address,
+  });
 
   // State for WalletConnect
   const [uri, setUri] = useState<string>("");
@@ -727,6 +734,33 @@ export default function WalletBridgePage() {
     }
   }, [currentSessionRequest, chainId]);
 
+  // Add copy function
+  const copyAddress = useCallback(async () => {
+    if (!address) return;
+
+    try {
+      await navigator.clipboard.writeText(address);
+      toast({
+        title: "Address copied",
+        description: "Wallet address copied to clipboard",
+        status: "success",
+        duration: 2000,
+        isClosable: true,
+        position: "bottom-right",
+      });
+    } catch (error) {
+      console.error("Failed to copy address:", error);
+      toast({
+        title: "Copy failed",
+        description: "Failed to copy address to clipboard",
+        status: "error",
+        duration: 3000,
+        isClosable: true,
+        position: "bottom-right",
+      });
+    }
+  }, [address, toast]);
+
   return (
     <Container
       mt="0.25rem"
@@ -794,8 +828,26 @@ export default function WalletBridgePage() {
               <Text fontSize="sm" color="green.500" fontWeight="semibold">
                 ✅ Wallet Connected
               </Text>
-              <Text fontSize="xs" color="gray.500">
-                {address?.slice(0, 6)}...{address?.slice(-4)}
+              <HStack spacing={2} justify="flex-end" mb={1}>
+                <Text fontSize="xs" color="gray.500" noOfLines={1} maxW="200px">
+                  {address}
+                </Text>
+                <IconButton
+                  aria-label="Copy address"
+                  icon={<CopyIcon />}
+                  size="xs"
+                  variant="ghost"
+                  onClick={copyAddress}
+                  colorScheme="gray"
+                />
+              </HStack>
+              <Text fontSize="xs" color="gray.600" fontWeight="medium">
+                Balance:{" "}
+                {balance
+                  ? `${parseFloat(balance.formatted).toFixed(4)} ${
+                      balance.symbol
+                    }`
+                  : "Loading..."}
               </Text>
             </Box>
           )}
