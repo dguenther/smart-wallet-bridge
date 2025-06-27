@@ -154,7 +154,7 @@ export function headlessCSWConnector({
           console.log("request", args);
           if (args[0].method === "eth_sendTransaction") {
             console.log("custom handler! for eth_sendTransaction", args);
-            // @ts-ignore -- params is an array of unknown types
+            // @ts-expect-error -- params is an array of unknown types
             const tx = args[0].params[0];
 
             // Estimate call gas
@@ -198,11 +198,13 @@ export function headlessCSWConnector({
             console.log({ executeTx });
             return executeTx;
           } else if (args[0].method === "eth_signTypedData_v4") {
-            // @ts-ignore -- params is an array of unknown types
+            // @ts-expect-error -- params is an array of unknown types
             let typedData = args[0].params[1];
             try {
               typedData = JSON.parse(typedData);
-            } catch (e) {}
+            } catch (e) {
+              console.error("Error parsing typed data:", e);
+            }
 
             const signature = await walletClient.signTypedData({
               ...typedData,
