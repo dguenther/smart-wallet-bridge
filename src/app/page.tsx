@@ -61,7 +61,6 @@ export default function WalletBridgePage() {
   const { switchChainAsync } = useSwitchChain();
   const { connect } = useConnect();
 
-
   // State for WalletConnect
   const [uri, setUri] = useState<string>("");
   const [pasted, setPasted] = useState(false);
@@ -205,7 +204,8 @@ export default function WalletBridgePage() {
               rows={3}
             />
             <FormHelperText>
-              Recovery phrase starting with &apos;wallet&apos; followed by 12 words
+              Recovery phrase starting with &apos;wallet&apos; followed by 12
+              words
             </FormHelperText>
           </FormControl>
 
@@ -283,8 +283,13 @@ export default function WalletBridgePage() {
             request.method === "eth_signTypedData_v3" ||
             request.method === "eth_signTypedData_v4"
           ) {
-            // Handle typed data signing
-            const typedData = request.params[1]; // The typed data is usually the second parameter
+            let typedData = request.params[1];
+            try {
+              typedData = JSON.parse(request.params[1]);
+            } catch (e) {
+              console.error("Error parsing typed data:", e);
+            }
+
             const signature = await walletClient.signTypedData({
               account: address as `0x${string}`,
               domain: typedData.domain,
@@ -822,7 +827,17 @@ export default function WalletBridgePage() {
                   mb={{ base: 3, md: 4 }}
                 >
                   <Text mb={{ base: 3, md: 4 }}>
-                    First, enter your smart wallet address and recovery phrase. You can generate a recovery phrase <a href="https://keys.coinbase.com/settings/account-recovery" target="_blank" rel="noopener noreferrer" style={{ textDecoration: "underline" }}>here</a>.
+                    First, enter your smart wallet address and recovery phrase.
+                    You can generate a recovery phrase{" "}
+                    <a
+                      href="https://keys.coinbase.com/settings/account-recovery"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{ textDecoration: "underline" }}
+                    >
+                      here
+                    </a>
+                    .
                   </Text>
                   <HeadlessCSWForm />
                 </Box>
