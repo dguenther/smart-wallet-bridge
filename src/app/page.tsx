@@ -71,6 +71,10 @@ export default function WalletBridgePage() {
   const { disconnect } = useDisconnect();
   const { data: balance } = useBalance({
     address: address,
+    query: {
+      refetchOnMount: true,
+      refetchInterval: 10000,
+    },
   });
 
   // Add balance query for recovery owner
@@ -78,6 +82,8 @@ export default function WalletBridgePage() {
   const { data: recoveryOwnerBalance } = useBalance({
     address: recoveryOwnerAddress as `0x${string}`,
     query: {
+      refetchOnMount: true,
+      refetchInterval: 10000,
       enabled: !!recoveryOwnerAddress,
     },
   });
