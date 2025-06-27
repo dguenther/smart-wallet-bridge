@@ -18,7 +18,6 @@ import {
   FormLabel,
   FormHelperText,
   useColorModeValue,
-  Textarea,
   IconButton,
   HStack,
   Collapse,
@@ -28,6 +27,8 @@ import {
   NumberInputStepper,
   NumberIncrementStepper,
   NumberDecrementStepper,
+  InputGroup,
+  InputRightElement,
 } from "@chakra-ui/react";
 import {
   useAccount,
@@ -43,6 +44,7 @@ import { bytesToHex, pad } from "viem";
 import { buildApprovedNamespaces } from "@walletconnect/utils";
 import { headlessCSWConnector } from "@/utils/headlessCSWConnector";
 import { CopyIcon } from "@chakra-ui/icons";
+import { ViewIcon, ViewOffIcon } from "@chakra-ui/icons";
 
 // Import types
 import { SessionProposal, SessionRequest, WalletKitInstance } from "./types";
@@ -128,6 +130,9 @@ export default function WalletBridgePage() {
   const [showAdvanced, setShowAdvanced] = useState<boolean>(false);
   const [manualAddress, setManualAddress] = useState<string>("");
   const [manualOwnerIndex, setManualOwnerIndex] = useState<number>(2);
+
+  // State for recovery phrase visibility
+  const [showRecoveryPhrase, setShowRecoveryPhrase] = useState<boolean>(false);
 
   // HeadlessCSW Form Component
   const HeadlessCSWForm = () => {
@@ -299,12 +304,23 @@ export default function WalletBridgePage() {
 
           <FormControl isRequired>
             <FormLabel>Recovery Phrase</FormLabel>
-            <Textarea
-              placeholder="wallet word1 word2 word3 ... word12"
-              value={recoveryPhrase}
-              onChange={(e) => setRecoveryPhrase(e.target.value)}
-              rows={3}
-            />
+            <InputGroup>
+              <Input
+                type={showRecoveryPhrase ? "text" : "password"}
+                placeholder="wallet word1 word2 word3 ... word12"
+                value={recoveryPhrase}
+                onChange={(e) => setRecoveryPhrase(e.target.value)}
+              />
+              <InputRightElement>
+                <IconButton
+                  aria-label="Toggle recovery phrase visibility"
+                  icon={showRecoveryPhrase ? <ViewOffIcon /> : <ViewIcon />}
+                  size="xs"
+                  variant="ghost"
+                  onClick={() => setShowRecoveryPhrase(!showRecoveryPhrase)}
+                />
+              </InputRightElement>
+            </InputGroup>
             <FormHelperText>
               Recovery phrase starting with &apos;wallet&apos; followed by 12
               words. We&apos;ll automatically find your smart wallet address.
