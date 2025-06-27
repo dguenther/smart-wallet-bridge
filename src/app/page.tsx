@@ -16,17 +16,18 @@ import {
   Button,
   FormControl,
   FormLabel,
+  FormHelperText,
+  useColorModeValue,
+  Textarea,
+  IconButton,
+  HStack,
+  Collapse,
   Input,
   NumberInput,
   NumberInputField,
   NumberInputStepper,
   NumberIncrementStepper,
   NumberDecrementStepper,
-  FormHelperText,
-  useColorModeValue,
-  Textarea,
-  IconButton,
-  HStack,
 } from "@chakra-ui/react";
 import {
   useAccount,
@@ -35,9 +36,10 @@ import {
   useSwitchChain,
   useConnect,
   useBalance,
+  useDisconnect,
 } from "wagmi";
 import { mnemonicToAccount } from "viem/accounts";
-import { bytesToHex } from "viem";
+import { bytesToHex, pad } from "viem";
 import { buildApprovedNamespaces } from "@walletconnect/utils";
 import { headlessCSWConnector } from "@/utils/headlessCSWConnector";
 import { CopyIcon } from "@chakra-ui/icons";
@@ -64,8 +66,18 @@ export default function WalletBridgePage() {
   const chainId = useChainId();
   const { switchChainAsync } = useSwitchChain();
   const { connect } = useConnect();
+  const { disconnect } = useDisconnect();
   const { data: balance } = useBalance({
     address: address,
+  });
+
+  // Add balance query for recovery owner
+  const [recoveryOwnerAddress, setRecoveryOwnerAddress] = useState<string>("");
+  const { data: recoveryOwnerBalance } = useBalance({
+    address: recoveryOwnerAddress as `0x${string}`,
+    query: {
+      enabled: !!recoveryOwnerAddress,
+    },
   });
 
   // State for WalletConnect
@@ -109,10 +121,13 @@ export default function WalletBridgePage() {
   const [targetChainId, setTargetChainId] = useState<number | null>(null);
 
   // State for HeadlessCSW form
-  const [cswAddress, setCswAddress] = useState<string>("");
   const [recoveryPhrase, setRecoveryPhrase] = useState<string>("");
-  const [ownerIndex, setOwnerIndex] = useState<number>(2);
   const [isConnecting, setIsConnecting] = useState<boolean>(false);
+
+  // Advanced options state
+  const [showAdvanced, setShowAdvanced] = useState<boolean>(false);
+  const [manualAddress, setManualAddress] = useState<string>("");
+  const [manualOwnerIndex, setManualOwnerIndex] = useState<number>(2);
 
   // HeadlessCSW Form Component
   const HeadlessCSWForm = () => {
@@ -120,10 +135,10 @@ export default function WalletBridgePage() {
     const borderColor = useColorModeValue("gray.200", "gray.600");
 
     const handleConnect = async () => {
-      if (!cswAddress || !recoveryPhrase) {
+      if (!recoveryPhrase) {
         toast({
           title: "Missing Information",
-          description: "Please provide both address and recovery phrase",
+          description: "Please provide your recovery phrase",
           status: "error",
           duration: 3000,
           isClosable: true,
@@ -157,10 +172,102 @@ export default function WalletBridgePage() {
         const privateKeyBytes = recoveryOwnerAccount.getHdKey().privateKey;
         const ownerPrivateKey = bytesToHex(privateKeyBytes!);
 
+        // Store the recovery owner address for display
+        const recoveryOwnerAddr = recoveryOwnerAccount.address;
+        setRecoveryOwnerAddress(recoveryOwnerAddr);
+
+        let smartWalletAddress = manualAddress;
+        let finalOwnerIndex = manualOwnerIndex;
+
+        // If manual values are not provided, try automatic discovery
+        if (!manualAddress) {
+          // Derive public key for API query
+          const publicKeyBytes = recoveryOwnerAccount.getHdKey().publicKey;
+          const publicKey = bytesToHex(publicKeyBytes!);
+
+          console.log("publicKey", publicKey);
+
+          toast({
+            title: "Looking up smart wallet",
+            description: "Finding your smart wallet address...",
+            status: "info",
+            duration: 2000,
+            isClosable: true,
+            position: "bottom-right",
+          });
+
+          // Query the addOwner API by owner public key
+          // Note: This assumes an endpoint that queries by owner - may need API endpoint adjustment
+          const paddedOwnerAddress = pad(recoveryOwnerAddr, {
+            size: 32,
+          });
+          const apiUrl = `https://addowner-indexer-production.up.railway.app/events/${paddedOwnerAddress}`;
+
+          let response;
+          let addOwnerEvents;
+
+          try {
+            response = await fetch(apiUrl);
+
+            if (!response.ok) {
+              // If by-owner endpoint doesn't exist, we'll need to handle this differently
+              throw new Error(
+                `API request failed: ${response.status} ${response.statusText}`
+              );
+            }
+
+            addOwnerEvents = await response.json();
+          } catch {
+            // Fallback: inform user that we need the address
+            throw new Error(
+              "Could not automatically find your smart wallet address. Please use the advanced options to manually enter your wallet address."
+            );
+          }
+
+          if (!addOwnerEvents || addOwnerEvents.length === 0) {
+            throw new Error(
+              "No smart wallet found for this recovery phrase. Please verify your recovery phrase is correct or use the advanced options."
+            );
+          }
+
+          // Use the first matching event's address and index
+          const matchingEvent = addOwnerEvents[0];
+          smartWalletAddress = matchingEvent.address;
+          finalOwnerIndex = matchingEvent.index;
+
+          toast({
+            title: "Smart wallet found",
+            description: `Found wallet ${smartWalletAddress.slice(
+              0,
+              6
+            )}...${smartWalletAddress.slice(
+              -4
+            )} at owner index ${finalOwnerIndex}`,
+            status: "success",
+            duration: 4000,
+            isClosable: true,
+            position: "bottom-right",
+          });
+        } else {
+          toast({
+            title: "Using manual configuration",
+            description: `Connecting to ${smartWalletAddress.slice(
+              0,
+              6
+            )}...${smartWalletAddress.slice(
+              -4
+            )} with owner index ${finalOwnerIndex}`,
+            status: "info",
+            duration: 3000,
+            isClosable: true,
+            position: "bottom-right",
+          });
+        }
+
         connect({
           connector: headlessCSWConnector({
-            address: cswAddress as `0x${string}`,
-            ownerIndex,
+            address: smartWalletAddress as `0x${string}`,
+            ownerIndex: finalOwnerIndex,
             ownerPrivateKey: ownerPrivateKey as `0x${string}`,
           }),
         });
@@ -191,18 +298,6 @@ export default function WalletBridgePage() {
           <Heading size="md">Connect Headless Smart Wallet</Heading>
 
           <FormControl isRequired>
-            <FormLabel>Smart Wallet Address</FormLabel>
-            <Input
-              placeholder="0x..."
-              value={cswAddress}
-              onChange={(e) => setCswAddress(e.target.value)}
-            />
-            <FormHelperText>
-              The address of your Coinbase Smart Wallet
-            </FormHelperText>
-          </FormControl>
-
-          <FormControl isRequired>
             <FormLabel>Recovery Phrase</FormLabel>
             <Textarea
               placeholder="wallet word1 word2 word3 ... word12"
@@ -212,31 +307,73 @@ export default function WalletBridgePage() {
             />
             <FormHelperText>
               Recovery phrase starting with &apos;wallet&apos; followed by 12
-              words
+              words. We&apos;ll automatically find your smart wallet address.
             </FormHelperText>
           </FormControl>
 
-          <FormControl>
-            <FormLabel>Owner Index</FormLabel>
-            <NumberInput
-              value={ownerIndex}
-              onChange={(_, value) => setOwnerIndex(value || 2)}
-              min={0}
+          <Box>
+            <Button
+              variant="link"
+              size="sm"
+              onClick={() => setShowAdvanced(!showAdvanced)}
+              mb={2}
             >
-              <NumberInputField />
-              <NumberInputStepper>
-                <NumberIncrementStepper />
-                <NumberDecrementStepper />
-              </NumberInputStepper>
-            </NumberInput>
-            <FormHelperText>Index of the owner (default: 2)</FormHelperText>
-          </FormControl>
+              {showAdvanced ? "Hide" : "Show"} Advanced Options
+            </Button>
+
+            <Collapse in={showAdvanced} animateOpacity>
+              <VStack
+                spacing={3}
+                align="stretch"
+                p={3}
+                borderWidth={1}
+                borderRadius="md"
+                bg={useColorModeValue("gray.100", "gray.600")}
+              >
+                <Text fontSize="sm" fontWeight="medium">
+                  Manual Configuration (optional)
+                </Text>
+
+                <FormControl>
+                  <FormLabel fontSize="sm">Smart Wallet Address</FormLabel>
+                  <Input
+                    placeholder="0x..."
+                    value={manualAddress}
+                    onChange={(e) => setManualAddress(e.target.value)}
+                    size="sm"
+                  />
+                  <FormHelperText fontSize="xs">
+                    Manually specify your smart wallet address
+                  </FormHelperText>
+                </FormControl>
+
+                <FormControl>
+                  <FormLabel fontSize="sm">Owner Index</FormLabel>
+                  <NumberInput
+                    value={manualOwnerIndex}
+                    onChange={(_, value) => setManualOwnerIndex(value || 2)}
+                    min={0}
+                    size="sm"
+                  >
+                    <NumberInputField />
+                    <NumberInputStepper>
+                      <NumberIncrementStepper />
+                      <NumberDecrementStepper />
+                    </NumberInputStepper>
+                  </NumberInput>
+                  <FormHelperText fontSize="xs">
+                    Owner index for this recovery phrase (default: 2)
+                  </FormHelperText>
+                </FormControl>
+              </VStack>
+            </Collapse>
+          </Box>
 
           <Button
             colorScheme="blue"
             onClick={handleConnect}
             isLoading={isConnecting}
-            loadingText="Connecting..."
+            loadingText="Finding wallet..."
           >
             Connect Wallet
           </Button>
@@ -761,6 +898,47 @@ export default function WalletBridgePage() {
     }
   }, [address, toast]);
 
+  // Add copy function for recovery owner address
+  const copyRecoveryOwnerAddress = useCallback(async () => {
+    if (!recoveryOwnerAddress) return;
+
+    try {
+      await navigator.clipboard.writeText(recoveryOwnerAddress);
+      toast({
+        title: "Recovery address copied",
+        description: "Recovery owner address copied to clipboard",
+        status: "success",
+        duration: 2000,
+        isClosable: true,
+        position: "bottom-right",
+      });
+    } catch (error) {
+      console.error("Failed to copy recovery address:", error);
+      toast({
+        title: "Copy failed",
+        description: "Failed to copy recovery address to clipboard",
+        status: "error",
+        duration: 3000,
+        isClosable: true,
+        position: "bottom-right",
+      });
+    }
+  }, [recoveryOwnerAddress, toast]);
+
+  // Handle disconnect
+  const handleDisconnect = useCallback(() => {
+    disconnect();
+    setRecoveryOwnerAddress("");
+    toast({
+      title: "Wallet disconnected",
+      description: "Successfully disconnected from wallet",
+      status: "info",
+      duration: 3000,
+      isClosable: true,
+      position: "bottom-right",
+    });
+  }, [disconnect, toast]);
+
   return (
     <Container
       mt="0.25rem"
@@ -825,30 +1003,92 @@ export default function WalletBridgePage() {
           <Heading size={{ base: "xl", md: "xl" }}>Smart Wallet Bridge</Heading>
           {isConnected && (
             <Box textAlign="right">
-              <Text fontSize="sm" color="green.500" fontWeight="semibold">
-                ✅ Wallet Connected
-              </Text>
-              <HStack spacing={2} justify="flex-end" mb={1}>
-                <Text fontSize="xs" color="gray.500" noOfLines={1} maxW="200px">
-                  {address}
+              <HStack spacing={2} justify="flex-end" mb={2}>
+                <Text fontSize="sm" color="green.500" fontWeight="semibold">
+                  ✅ Wallet Connected
                 </Text>
-                <IconButton
-                  aria-label="Copy address"
-                  icon={<CopyIcon />}
+                <Button
                   size="xs"
-                  variant="ghost"
-                  onClick={copyAddress}
-                  colorScheme="gray"
-                />
+                  variant="outline"
+                  colorScheme="red"
+                  onClick={handleDisconnect}
+                >
+                  Disconnect
+                </Button>
               </HStack>
-              <Text fontSize="xs" color="gray.600" fontWeight="medium">
-                Balance:{" "}
-                {balance
-                  ? `${parseFloat(balance.formatted).toFixed(4)} ${
-                      balance.symbol
-                    }`
-                  : "Loading..."}
-              </Text>
+
+              {/* Smart Wallet Address */}
+              <Box mb={2}>
+                <Text fontSize="xs" color="gray.500" fontWeight="medium" mb={1}>
+                  Smart Wallet:
+                </Text>
+                <HStack spacing={2} justify="flex-end" mb={1}>
+                  <Text
+                    fontSize="xs"
+                    color="gray.500"
+                    noOfLines={1}
+                    maxW="200px"
+                  >
+                    {address}
+                  </Text>
+                  <IconButton
+                    aria-label="Copy smart wallet address"
+                    icon={<CopyIcon />}
+                    size="xs"
+                    variant="ghost"
+                    onClick={copyAddress}
+                    colorScheme="gray"
+                  />
+                </HStack>
+                <Text fontSize="xs" color="gray.600" fontWeight="medium">
+                  Balance:{" "}
+                  {balance
+                    ? `${parseFloat(balance.formatted).toFixed(4)} ${
+                        balance.symbol
+                      }`
+                    : "Loading..."}
+                </Text>
+              </Box>
+
+              {/* Recovery Owner Address */}
+              {recoveryOwnerAddress && (
+                <Box>
+                  <Text
+                    fontSize="xs"
+                    color="gray.500"
+                    fontWeight="medium"
+                    mb={1}
+                  >
+                    Recovery Owner:
+                  </Text>
+                  <HStack spacing={2} justify="flex-end" mb={1}>
+                    <Text
+                      fontSize="xs"
+                      color="gray.500"
+                      noOfLines={1}
+                      maxW="200px"
+                    >
+                      {recoveryOwnerAddress}
+                    </Text>
+                    <IconButton
+                      aria-label="Copy recovery owner address"
+                      icon={<CopyIcon />}
+                      size="xs"
+                      variant="ghost"
+                      onClick={copyRecoveryOwnerAddress}
+                      colorScheme="gray"
+                    />
+                  </HStack>
+                  <Text fontSize="xs" color="gray.600" fontWeight="medium">
+                    Balance:{" "}
+                    {recoveryOwnerBalance
+                      ? `${parseFloat(recoveryOwnerBalance.formatted).toFixed(
+                          4
+                        )} ${recoveryOwnerBalance.symbol}`
+                      : "Loading..."}
+                  </Text>
+                </Box>
+              )}
             </Box>
           )}
         </Flex>
@@ -879,8 +1119,10 @@ export default function WalletBridgePage() {
                   mb={{ base: 3, md: 4 }}
                 >
                   <Text mb={{ base: 3, md: 4 }}>
-                    First, enter your smart wallet address and recovery phrase.
-                    You can generate a recovery phrase{" "}
+                    Enter your recovery phrase to automatically connect to your
+                    smart wallet. If automatic discovery doesn&apos;t work, use
+                    the advanced options to manually specify your wallet
+                    details. You can generate a recovery phrase{" "}
                     <a
                       href="https://keys.coinbase.com/settings/account-recovery"
                       target="_blank"
