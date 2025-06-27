@@ -44,7 +44,6 @@ import {
 import { DecodedSignatureData, SessionRequest } from "../types";
 import { chainIdToChain } from "@/utils/supportedChains";
 import { useCallback, useEffect, useState } from "react";
-import axios from "axios";
 import { generateTenderlyUrl } from "@/utils";
 import { BsArrowsAngleExpand, BsArrowsAngleContract } from "react-icons/bs";
 
@@ -124,21 +123,8 @@ export default function SessionRequestModal({
           // TODO: consider reimplementing contract fetching
         }
       } catch {
-        try {
-          const res = await axios.get(
-            `${
-              process.env.NEXT_PUBLIC_DEVELOPMENT === "true"
-                ? ""
-                : "https://dguenther.github.io/smart-wallet-bridge"
-            }/api/labels/${address}`
-          );
-          const data = res.data;
-          if (data.length > 0) {
-            setAddressLabels(data);
-          }
-        } catch {
-          setAddressLabels([]);
-        }
+        // TODO: consider reimplementing address label API
+        setAddressLabels([]);
       }
     },
     []
