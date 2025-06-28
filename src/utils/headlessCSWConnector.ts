@@ -7,6 +7,7 @@ import {
   getAddress,
   http,
   numberToHex,
+  pad,
 } from "viem";
 import {
   createBundlerClient,
@@ -15,7 +16,10 @@ import {
   toCoinbaseSmartAccount,
 } from "viem/account-abstraction";
 import { privateKeyToAccount } from "viem/accounts";
+import { readContract } from "viem/actions";
 import { ChainNotConfiguredError, createConnector } from "wagmi";
+import { smartWalletAbi } from "./smartWalletAbi";
+import { syncSmartAccountOwners } from "./syncSmartAccountOwners";
 
 headlessCSWConnector.type = "headlessCSWConnector" as const;
 
@@ -154,6 +158,30 @@ export function headlessCSWConnector({
           console.log("request", args);
           if (args[0].method === "eth_sendTransaction") {
             console.log("custom handler! for eth_sendTransaction", args);
+
+            let found = false;
+            try {
+              const result = await readContract(publicClient, {
+                address: address,
+                abi: smartWalletAbi,
+                functionName: "ownerAtIndex",
+                args: [BigInt(ownerIndex)],
+              })
+              found = pad(ownerAccount.address.toLowerCase() as `0x${string}`) === result.toLowerCase()
+            } catch {
+              found = false;
+            }
+
+            console.log("found owner?", found);
+
+            if (!found) {
+              await syncSmartAccountOwners({
+                targetClient: publicClient,
+                targetWalletClient: ownerWalletClient,
+                address,
+              });
+            }
+
             // @ts-expect-error -- params is an array of unknown types
             const tx = args[0].params[0];
 
