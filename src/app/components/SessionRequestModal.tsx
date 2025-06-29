@@ -63,6 +63,7 @@ interface SessionRequestModalProps {
   onReject: () => void;
   onChainSwitch: () => void;
   portalId?: string;
+  disabledMessage?: string;
 }
 
 export default function SessionRequestModal({
@@ -81,6 +82,7 @@ export default function SessionRequestModal({
   onReject,
   onChainSwitch,
   portalId,
+  disabledMessage,
 }: SessionRequestModalProps) {
   const { address: connectedAddress } = useAccount();
 
@@ -536,7 +538,13 @@ export default function SessionRequestModal({
                                               )[1];
                                             const chainIdNum =
                                               parseInt(chainIdStr);
-                                            return <Box key={i}><Text>{i}</Text><Text>{arg}</Text><Text>{chainIdNum}</Text></Box>
+                                            return (
+                                              <Box key={i}>
+                                                <Text>{i}</Text>
+                                                <Text>{arg}</Text>
+                                                <Text>{chainIdNum}</Text>
+                                              </Box>
+                                            );
                                           }
                                         )}
                                       </Stack>
@@ -925,72 +933,101 @@ export default function SessionRequestModal({
             )}
           </ModalBody>
           <ModalFooter borderTopWidth="1px" borderColor="whiteAlpha.200">
-            <Flex w="100%" justifyContent="space-between" alignItems="center">
-              {currentSessionRequest?.params?.request?.method ===
-                "eth_sendTransaction" && (
-                <Button
-                  colorScheme="whiteAlpha"
-                  size={{ base: "sm", md: "md" }}
-                  onClick={() => {
-                    const txData =
-                      currentSessionRequest.params.request.params[0];
-                    const chainIdStr =
-                      currentSessionRequest.params.chainId.split(":")[1];
-                    const chainId = parseInt(chainIdStr);
-
-                    const url = generateTenderlyUrl(
-                      {
-                        from: connectedAddress || zeroAddress,
-                        to: txData.to,
-                        value: txData.value || "0",
-                        data: txData.data || "0x",
-                      },
-                      chainId
-                    );
-                    window.open(url, "_blank");
-                  }}
-                >
-                  <HStack>
-                    <Text color="white">Simulate</Text>
-                  </HStack>
-                </Button>
-              )}
-              <HStack spacing={3}>
-                <Button
-                  colorScheme="red"
-                  onClick={onReject}
-                  isDisabled={pendingRequest || isSwitchingChain}
-                  size={{ base: "sm", md: "md" }}
-                >
-                  Reject
-                </Button>
-
-                {needsChainSwitch && targetChainId ? (
+            <VStack w="100%" spacing={3}>
+              <Flex w="100%" justifyContent="space-between" alignItems="center">
+                {currentSessionRequest?.params?.request?.method ===
+                  "eth_sendTransaction" && (
                   <Button
-                    colorScheme="orange"
-                    onClick={onChainSwitch}
-                    isLoading={isSwitchingChain}
-                    loadingText="Switching..."
+                    colorScheme="whiteAlpha"
                     size={{ base: "sm", md: "md" }}
+                    onClick={() => {
+                      const txData =
+                        currentSessionRequest.params.request.params[0];
+                      const chainIdStr =
+                        currentSessionRequest.params.chainId.split(":")[1];
+                      const chainId = parseInt(chainIdStr);
+
+                      const url = generateTenderlyUrl(
+                        {
+                          from: connectedAddress || zeroAddress,
+                          to: txData.to,
+                          value: txData.value || "0",
+                          data: txData.data || "0x",
+                        },
+                        chainId
+                      );
+                      window.open(url, "_blank");
+                    }}
                   >
-                    Switch to{" "}
-                    {chainIdToChain(targetChainId)?.name ||
-                      `Chain ID: ${targetChainId}`}
-                  </Button>
-                ) : (
-                  <Button
-                    colorScheme="blue"
-                    onClick={onApprove}
-                    isLoading={pendingRequest}
-                    loadingText="Processing..."
-                    isDisabled={needsChainSwitch || isSwitchingChain}
-                    size={{ base: "sm", md: "md" }}
-                  >
-                    {approveText || "Approve"}
+                    <HStack>
+                      <Text color="white">Simulate</Text>
+                    </HStack>
                   </Button>
                 )}
-              </HStack>
-            </Flex>
+                <HStack spacing={3}>
+                  <Button
+                    colorScheme="red"
+                    onClick={onReject}
+                    isDisabled={pendingRequest || isSwitchingChain}
+                    size={{ base: "sm", md: "md" }}
+                  >
+                    Reject
+                  </Button>
+
+                  {needsChainSwitch && targetChainId ? (
+                    <Button
+                      colorScheme="orange"
+                      onClick={onChainSwitch}
+                      isLoading={isSwitchingChain}
+                      loadingText="Switching..."
+                      size={{ base: "sm", md: "md" }}
+                    >
+                      Switch to{" "}
+                      {chainIdToChain(targetChainId)?.name ||
+                        `Chain ID: ${targetChainId}`}
+                    </Button>
+                  ) : (
+                    <Button
+                      colorScheme="blue"
+                      onClick={onApprove}
+                      isLoading={pendingRequest}
+                      loadingText="Processing..."
+                      isDisabled={
+                        needsChainSwitch ||
+                        isSwitchingChain ||
+                        (!!disabledMessage &&
+                          !!currentSessionRequest?.params?.request?.method &&
+                          ["eth_sendTransaction", "eth_sendCalls"].includes(
+                            currentSessionRequest.params.request.method
+                          ))
+                      }
+                      size={{ base: "sm", md: "md" }}
+                    >
+                      {approveText || "Approve"}
+                    </Button>
+                  )}
+                </HStack>
+              </Flex>
+              {disabledMessage &&
+                currentSessionRequest?.params?.request?.method &&
+                ["eth_sendTransaction", "eth_sendCalls"].includes(
+                  currentSessionRequest.params.request.method
+                ) && (
+                  <Text
+                    color="orange.300"
+                    fontSize={{ base: "xs", md: "sm" }}
+                    textAlign="center"
+                    p={2}
+                    bg="orange.900"
+                    borderRadius="md"
+                    width="100%"
+                    border="1px solid"
+                    borderColor="orange.500"
+                  >
+                    ⚠️ {disabledMessage}
+                  </Text>
+                )}
+            </VStack>
           </ModalFooter>
         </ModalContent>
       </Box>

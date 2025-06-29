@@ -1205,6 +1205,21 @@ export default function WalletBridgePage() {
         onApprove={() => handleSessionRequest(true)}
         onReject={() => handleSessionRequest(false)}
         onChainSwitch={handleChainSwitch}
+        disabledMessage={
+          currentSessionRequest &&
+          ["eth_sendTransaction", "eth_sendCalls"].includes(
+            currentSessionRequest.params.request.method
+          ) &&
+          recoveryOwnerBalance &&
+          parseFloat(recoveryOwnerBalance.formatted) === 0
+            ? `Recovery owner (${recoveryOwnerAddress?.slice(
+                0,
+                6
+              )}...${recoveryOwnerAddress?.slice(-4)}) has no ETH balance on ${
+                chainIdToChain(chainId)?.name || `Chain ID: ${chainId}`
+              } to pay for gas fees. Please fund the recovery owner address first.`
+            : undefined
+        }
       />
     </Container>
   );
