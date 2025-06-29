@@ -77,6 +77,7 @@ jobs:
         run: |
           echo "NEXT_PUBLIC_DEVELOPMENT=false" >> .env
           echo "NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=22207608507aa9567e37375b728414ca" >> .env
+          echo "NEXT_PUBLIC_API_URL=https://addowner-indexer-production.up.railway.app" >> .env
 
       - name: Build with Next.js
         run: ${{ steps.detect-package-manager.outputs.runner }} next build
