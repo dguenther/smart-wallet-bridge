@@ -1,18 +1,15 @@
 import {
   Account,
+  Address,
   Chain,
   decodeFunctionData,
-  encodeFunctionData,
-  formatEther,
+  Hex,
+  hexToNumber,
   PublicClient,
   Transport,
   WalletClient,
 } from "viem";
-import {
-  entryPoint06Abi,
-  entryPoint06Address,
-  UserOperation,
-} from "viem/account-abstraction";
+import { entryPoint06Abi, entryPoint06Address } from "viem/account-abstraction";
 import { smartWalletAbi } from "./smartWalletAbi";
 import { smartWalletFactoryAbi } from "./smartWalletFactoryAbi";
 
@@ -25,29 +22,43 @@ export async function syncSmartAccountOwners({
   targetWalletClient: WalletClient<Transport, Chain, Account>;
   address: `0x${string}`;
 }) {
-  const apiUrl = `https://addowner-indexer-production.up.railway.app/ops/${address}`;
+  const apiUrl = `${process.env.NEXT_PUBLIC_API_URL}/replayable-ops/${address}`;
 
   const response = await fetch(apiUrl);
 
   // TODO: Will probably need to deserialize UserOperation
   const data = (await response.json()) as {
-    transactionHash: `0x${string}`;
-    userOperation: UserOperation<"0.6">;
-  }[];
-  const addOwnerUserOps = data.map(({ userOperation }) => userOperation);
+    initCode: Hex;
+    items: {
+      transactionHash: Hex;
+      owner: Hex;
+      ownerIndex: number;
+      userOperation: {
+        sender: Address;
+        nonce: Hex;
+        initCode: Hex;
+        callData: Hex;
+        callGasLimit: Hex;
+        maxFeePerGas: Hex;
+        maxPriorityFeePerGas: Hex;
+        verificationGasLimit: Hex;
+        preVerificationGas: Hex;
+        paymasterAndData: Hex;
+        signature: Hex;
+      };
+    }[];
+  };
+  const replayableUserOps = data.items.map(
+    ({ userOperation }) => userOperation
+  );
 
-  if (!addOwnerUserOps[0]) {
-    throw new Error("No AddOwner logs found");
-  }
-
-  const deployUserOp = addOwnerUserOps[0];
-  if (!deployUserOp.initCode) {
-    throw new Error("Deploy user op has no init code");
+  if (data.initCode === "0x") {
+    throw new Error("No init code found");
   }
 
   const initData = decodeFunctionData({
     abi: smartWalletFactoryAbi,
-    data: ("0x" + deployUserOp.initCode.slice(42)) as `0x${string}`,
+    data: ("0x" + data.initCode.slice(42)) as `0x${string}`,
   });
 
   if (initData.functionName !== "createAccount") {
@@ -56,18 +67,11 @@ export async function syncSmartAccountOwners({
 
   const initialOwners = initData.args[0];
 
-  console.log("addOwnerUserOps", addOwnerUserOps);
-
   let nextAddOwnerIndex = initialOwners.length;
 
   console.log(
-    `Account will be initialized with ${initialOwners.length} owners`
+    `Account will be initialized with ${initialOwners.length} owners and ${replayableUserOps.length} replayable user ops`
   );
-
-  console.log("deploy tx", {
-    to: deployUserOp.initCode.slice(0, 42) as `0x${string}`,
-    data: ("0x" + deployUserOp.initCode.slice(42)) as `0x${string}`,
-  });
 
   const isDeployed = await targetClient.getCode({
     address,
@@ -75,14 +79,42 @@ export async function syncSmartAccountOwners({
 
   if (isDeployed) {
     console.log("Account already deployed");
-
+    // Check how many owners and if indexes consistent with AddOwner events
     const ownerCount = await targetClient.readContract({
       abi: smartWalletAbi,
       functionName: "ownerCount",
       address,
     });
 
-    // TODO: Check how many owners and if indexes consistent with AddOwner events
+    console.log(
+      `Found ${ownerCount} owners on target chain. Checking for consistency`
+    );
+
+    if (Number(ownerCount) !== initialOwners.length) {
+      // We have more owners than initial owners, so we need to check
+      // if the last owner is still consistent with the corresponding AddOwner event on Base
+      const ownerAtLastIndex = await targetClient.readContract({
+        abi: smartWalletAbi,
+        functionName: "ownerAtIndex",
+        address,
+        args: [ownerCount - BigInt(1)],
+      });
+
+      console.log(
+        `Looking for owner at index ${Number(ownerCount) - 1}`,
+        ownerAtLastIndex
+      );
+
+      const correspondingOwner = data.items.find(
+        (item) => item.ownerIndex === Number(ownerCount) - 1
+      )?.owner;
+
+      if (ownerAtLastIndex !== correspondingOwner) {
+        throw new Error(
+          `Owner at corresponding index does not match: Expected ${ownerAtLastIndex} but got ${correspondingOwner}`
+        );
+      }
+    }
 
     nextAddOwnerIndex = Number(ownerCount);
   } else {
@@ -90,9 +122,11 @@ export async function syncSmartAccountOwners({
 
     // Deploy smart account
     const deployTx = await targetWalletClient.sendTransaction({
-      to: deployUserOp.initCode.slice(0, 42) as `0x${string}`,
-      data: ("0x" + deployUserOp.initCode.slice(42)) as `0x${string}`,
+      to: data.initCode.slice(0, 42) as `0x${string}`,
+      data: ("0x" + data.initCode.slice(42)) as `0x${string}`,
     });
+
+    console.log("deployTx", deployTx);
 
     const receipt = await targetClient.waitForTransactionReceipt({
       hash: deployTx,
@@ -103,29 +137,28 @@ export async function syncSmartAccountOwners({
     }
   }
 
-  console.log("replaying from index", nextAddOwnerIndex);
+  const indexInItems = nextAddOwnerIndex - initialOwners.length;
 
-  if (
-    addOwnerUserOps.slice(nextAddOwnerIndex, nextAddOwnerIndex + 1).length === 0
-  ) {
+  console.log("Replaying from owner index", nextAddOwnerIndex);
+
+  if (replayableUserOps.slice(indexInItems).length === 0) {
     return 0;
   }
 
-  console.log("all addOwnerUserOps", addOwnerUserOps);
+  console.log("All addOwnerUserOps", replayableUserOps);
 
-  // TODO: Makes the typechecker happy on handleOps, not sure if this is correct
-  const userOpsToReplay = addOwnerUserOps.slice(nextAddOwnerIndex).map((userOp) => {
-    return {
-      ...userOp,
-      initCode: userOp.initCode ?? "0x",
-      paymasterAndData: userOp.paymasterAndData ?? "0x",
-    };
-  });
-
-  console.log("replaying ", userOpsToReplay);
+  const userOpsToReplay = replayableUserOps
+    .slice(indexInItems)
+    .map((userOp) => {
+      return {
+        ...userOp,
+        initCode: userOp.initCode ?? "0x",
+        paymasterAndData: userOp.paymasterAndData ?? "0x",
+      };
+    });
 
   userOpsToReplay.forEach((userOp) => {
-    const nonce = userOp.nonce & BigInt(0xfffffffff);
+    const nonce = BigInt(hexToNumber(userOp.nonce)) & BigInt(0xfffffffff);
 
     const functionData = decodeFunctionData({
       abi: smartWalletAbi,
@@ -145,44 +178,12 @@ export async function syncSmartAccountOwners({
     }
   });
 
-  const gas = BigInt(500_000);
-  const gasPrice = await targetClient.getGasPrice();
-  const gasCost = gas * gasPrice;
-
-  console.log("gasCost", formatEther(gasCost));
-
-  // Estimate gas for handleOps
-  // const gas = await targetClient.estimateGas({
-  //   to: entryPoint06Address,
-  //   data: encodeFunctionData({
-  //     abi: entryPoint06Abi,
-  //     functionName: "handleOps",
-  //     args: [userOpsToReplay, address],
-  //   }),
-  // });
-
-  // const gasPrice = await targetClient.getGasPrice();
-
-  // const gasCost = gas * gasPrice;
-
-  // console.log(
-  //   `Gas cost: ${formatEther(gasCost)} ETH (${formatEther(gas)} gas)`
-  // );
-
-  console.log("handleOps tx", {
-    to: entryPoint06Address,
-    data: encodeFunctionData({
-      abi: entryPoint06Abi,
-      functionName: "handleOps",
-      args: [userOpsToReplay, address],
-    }),
-  });
-
   // Replay all the userOps on target chain
   const handleOpsTx = await targetWalletClient.writeContract({
     abi: entryPoint06Abi,
     address: entryPoint06Address,
     functionName: "handleOps",
+    // @ts-expect-error -- userOpsToReplay is not typed correctly but will be converted by viem
     args: [userOpsToReplay, address],
   });
 

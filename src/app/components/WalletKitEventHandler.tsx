@@ -1,9 +1,7 @@
 import { useEffect } from "react";
 import { useToast } from "@chakra-ui/react";
 import { SessionProposal, SessionRequest, WalletKitInstance } from "../types";
-import {
-  decodeSignMessage,
-} from "@/utils/decodeSignMessage";
+import { decodeSignMessage } from "@/utils/decodeSignMessage";
 import { formatTypedData } from "@/utils/formatTypedData";
 import { filterActiveSessions } from "@/utils/filterActiveSessions";
 import { buildApprovedNamespaces } from "@walletconnect/utils";
@@ -60,22 +58,93 @@ export default function WalletKitEventHandler({
             const chains = supportedChains.map((chain) => `eip155:${chain.id}`);
             const accounts = chains.map((chain) => `${chain}:${address}`);
 
+            // Get all methods from required and optional namespaces
+            const requiredMethods =
+              proposal.params.requiredNamespaces?.eip155?.methods || [];
+            const optionalMethods =
+              proposal.params.optionalNamespaces?.eip155?.methods || [];
+            const requiredEvents =
+              proposal.params.requiredNamespaces?.eip155?.events || [];
+            const optionalEvents =
+              proposal.params.optionalNamespaces?.eip155?.events || [];
+
+            // Combine all requested methods and events
+            const allRequestedMethods = [
+              ...new Set([...requiredMethods, ...optionalMethods]),
+            ];
+            const allRequestedEvents = [
+              ...new Set([...requiredEvents, ...optionalEvents]),
+            ];
+
+            // Standard methods we support
+            const supportedMethods = [
+              "eth_sendTransaction",
+              "eth_sendRawTransaction",
+              "eth_sign",
+              "personal_sign",
+              "eth_signTransaction",
+              "eth_signTypedData",
+              "eth_signTypedData_v3",
+              "eth_signTypedData_v4",
+              "eth_accounts",
+              "eth_requestAccounts",
+              "eth_chainId",
+              "net_version",
+              "web3_clientVersion",
+              "wallet_switchEthereumChain",
+              "wallet_addEthereumChain",
+              // "wallet_getPermissions",
+              // "wallet_requestPermissions",
+              // "wallet_registerOnboarding",
+              // "wallet_watchAsset",
+              // "wallet_scanQRCode",
+              // "wallet_sendCalls",
+              // "wallet_getCapabilities",
+              // "wallet_getCallsStatus",
+              // "wallet_showCallsStatus",
+              "eth_decrypt",
+              "eth_getEncryptionPublicKey",
+            ];
+
+            // Standard events we support
+            const supportedEvents = [
+              "chainChanged",
+              "accountsChanged",
+              "connect",
+              "disconnect",
+              "message",
+            ];
+
+            // Filter to only include methods and events that we support
+            const methodsToInclude = allRequestedMethods.filter((method) =>
+              supportedMethods.includes(method)
+            );
+            const eventsToInclude = allRequestedEvents.filter((event) =>
+              supportedEvents.includes(event)
+            );
+
+            // If no methods were requested or matched, include basic ones
+            if (methodsToInclude.length === 0) {
+              methodsToInclude.push(
+                "eth_sendTransaction",
+                "personal_sign",
+                "eth_signTypedData_v4"
+              );
+            }
+
+            // If no events were requested or matched, include basic ones
+            if (eventsToInclude.length === 0) {
+              eventsToInclude.push("chainChanged", "accountsChanged");
+            }
+
             const namespaces = buildApprovedNamespaces({
               proposal: proposal.params,
               supportedNamespaces: {
                 eip155: {
                   chains,
                   accounts,
-                  methods: [
-                    "eth_sendTransaction",
-                    "eth_sign",
-                    "personal_sign",
-                    "eth_signTransaction",
-                    "eth_signTypedData",
-                    "eth_signTypedData_v3",
-                    "eth_signTypedData_v4",
-                  ],
-                  events: ["chainChanged", "accountsChanged"],
+                  methods: methodsToInclude,
+                  events: eventsToInclude,
                 },
               },
             });

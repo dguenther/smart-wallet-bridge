@@ -161,18 +161,18 @@ export function headlessCSWConnector({
 
             let found = false;
             try {
-              const result = await readContract(publicClient, {
+              const result = await publicClient.readContract({
                 address: address,
                 abi: smartWalletAbi,
                 functionName: "ownerAtIndex",
                 args: [BigInt(ownerIndex)],
-              })
-              found = pad(ownerAccount.address.toLowerCase() as `0x${string}`) === result.toLowerCase()
-            } catch {
+              });
+              found =
+                pad(ownerAccount.address.toLowerCase() as `0x${string}`) ===
+                result.toLowerCase();
+            } catch (error) {
               found = false;
             }
-
-            console.log("found owner?", found);
 
             if (!found) {
               await syncSmartAccountOwners({
@@ -186,7 +186,6 @@ export function headlessCSWConnector({
             const tx = args[0].params[0];
 
             // Estimate call gas
-
             const userOp = await bundlerClient.prepareUserOperation({
               calls: [
                 {
