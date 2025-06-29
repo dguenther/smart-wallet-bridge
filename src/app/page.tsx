@@ -212,7 +212,8 @@ export default function WalletBridgePage() {
           const paddedOwnerAddress = pad(recoveryOwnerAddr, {
             size: 32,
           });
-          const apiUrl = `https://addowner-indexer-production.up.railway.app/events/${paddedOwnerAddress}`;
+
+          const apiUrl = `${process.env.NEXT_PUBLIC_API_URL}/events/${paddedOwnerAddress}`;
 
           let response;
           let addOwnerEvents;
