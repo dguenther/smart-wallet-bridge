@@ -16,7 +16,6 @@ import {
   toCoinbaseSmartAccount,
 } from "viem/account-abstraction";
 import { privateKeyToAccount } from "viem/accounts";
-import { readContract } from "viem/actions";
 import { ChainNotConfiguredError, createConnector } from "wagmi";
 import { smartWalletAbi } from "./smartWalletAbi";
 import { syncSmartAccountOwners } from "./syncSmartAccountOwners";
@@ -170,7 +169,7 @@ export function headlessCSWConnector({
               found =
                 pad(ownerAccount.address.toLowerCase() as `0x${string}`) ===
                 result.toLowerCase();
-            } catch (error) {
+            } catch {
               found = false;
             }
 
